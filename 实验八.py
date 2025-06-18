@@ -52,14 +52,18 @@ def initialize_session_state():
 @cache_resource
 def load_trained_model():
     """加载训练好的模型"""
-    model_path = "output/trained_model.pkl"  # 相对路径
+    model_path = "output/trained_model.pkl"
     try:
         with open(model_path, 'rb') as f:
             model = pickle.load(f)
         st.session_state.model_loaded = True
+        st.success(f"模型加载成功，类型: {type(model)}")
         return model
     except Exception as e:
-        st.error(f"模型加载失败: {e}")
+        st.error(f"模型加载失败: {str(e)}")
+        # 打印详细的错误堆栈
+        import traceback
+        st.write(traceback.format_exc())
         return None
 
 @cache_data
