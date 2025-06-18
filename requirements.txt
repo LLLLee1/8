@@ -4,23 +4,17 @@ pandas==2.0.3
 numpy==1.24.4
 openpyxl==3.1.2
 
-# 推荐系统核心库（强制源码安装并指定编译参数）
+# 推荐系统核心库
 scikit-surprise==1.1.3
 cython==0.29.36
 
-# 依赖包（固定版本避免冲突）
+# 依赖包
 rich==14.0.0
 markdown-it-py==3.0.0
 mdurl==0.1.2
 pygments==2.19.1
 
-# 编译工具（云端环境增强）
+# 编译工具
 wheel==0.40.0
 setuptools==68.2.2
-pip==25.1.1  # 升级到最新版pip
-
-# 隐藏编译参数（通过环境变量传递）
-[options]
-install_requires =
-    CFLAGS=-fPIC
-    CXXFLAGS=-fPIC
+pip==25.1.1
