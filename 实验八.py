@@ -6,6 +6,45 @@ import random
 import os
 from surprise import Reader, Dataset, SVD
 from surprise.model_selection import train_test_split
+import subprocess
+import sys
+
+def check_surprise_installation():
+    """深度检查surprise库安装状态"""
+    try:
+        import surprise
+        st.success(f"surprise库版本: {surprise.__version__}")
+        
+        # 检查核心模块是否编译成功
+        from surprise import SVD
+        st.success("surprise核心模块加载成功")
+        
+        # 测试基本功能
+        dummy_data = [(1, 1, 5.0), (1, 2, 3.0)]
+        reader = surprise.Reader(rating_scale=(1, 5))
+        data = surprise.Dataset.load_from_list(dummy_data, reader)
+        trainset = data.build_full_trainset()
+        algo = SVD()
+        algo.fit(trainset)
+        st.success("surprise功能测试通过")
+        return True
+        
+    except Exception as e:
+        st.error(f"surprise库加载失败: {str(e)}")
+        
+        # 捕获编译错误细节
+        st.info("编译错误详情:")
+        try:
+            output = subprocess.check_output(
+                [sys.executable, "-c", "import surprise"],
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            st.code(output)
+        except subprocess.CalledProcessError as cpe:
+            st.code(cpe.output)
+        
+        return False
 
 # 检查是否在Streamlit环境中运行
 def is_running_in_streamlit():
