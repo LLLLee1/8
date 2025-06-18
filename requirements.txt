@@ -1,11 +1,19 @@
+# 基础依赖
 streamlit==1.24.0
 pandas==2.0.3
 numpy==1.24.4
-scikit-surprise==1.1.3
 openpyxl==3.1.2
+
+# 推荐系统核心库（添加编译依赖）
+scikit-surprise==1.1.3
+cython==0.29.36
+
+# 依赖包（明确版本避免冲突）
 rich==14.0.0
 markdown-it-py==3.0.0
 mdurl==0.1.2
 pygments==2.19.1
+
+# 编译工具（云端环境需要）
 wheel==0.40.0
 setuptools==68.2.2
