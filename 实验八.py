@@ -4,7 +4,8 @@ import numpy as np
 import pickle
 import random
 import os
-import implicit
+from lightfm import LightFM
+from lightfm.data import Dataset
 import scipy.sparse as sparse
 import subprocess
 import sys
@@ -90,59 +91,56 @@ def initialize_session_state():
 # 修改模型训练和预测逻辑
 @cache_resource
 def load_trained_model():
-    """加载训练好的模型（适配implicit）"""
+    """加载训练好的模型（适配lightfm）"""
     model_path = "output/trained_model.pkl"
     try:
         with open(model_path, 'rb') as f:
             model_data = pickle.load(f)
             
-            # 提取implicit模型和用户-物品矩阵
+            # 提取lightfm模型和数据
             model = model_data['model']
-            user_item_matrix = model_data['user_item_matrix']
+            dataset = model_data['dataset']
             
         st.session_state.model_loaded = True
         st.success(f"模型加载成功，类型: {type(model)}")
-        return model, user_item_matrix
+        return model, dataset
     except Exception as e:
         st.error(f"模型加载失败: {str(e)}")
         return None, None
 
 # 修改推荐生成函数
-def generate_recommendations_with_model(user_ratings, model, user_item_matrix, jokes_df):
-    """使用implicit模型生成推荐"""
+def generate_recommendations_with_model(user_ratings, model, dataset, jokes_df):
+    """使用lightfm模型生成推荐"""
     if not user_ratings:
         st.warning("请先为笑话评分")
         return []
     
-    # 获取所有笑话ID
-    all_joke_ids = jokes_df.index.tolist()
+    # 获取用户和物品映射
+    user_id_map, _, item_id_map, _ = dataset.mapping()
     
-    # 构建用户评分向量
-    user_vector = sparse.lil_matrix((1, user_item_matrix.shape[1]))
-    for joke_id, rating in user_ratings.items():
-        if joke_id in all_joke_ids:
-            joke_idx = all_joke_ids.index(joke_id)
-            user_vector[0, joke_idx] = rating
-    
-    # 转换为CSR格式
-    user_vector = user_vector.tocsr()
+    # 构建用户评分矩阵
+    user_item_matrix = dataset.build_interactions(
+        [(0, item_id_map[joke_id], rating) for joke_id, rating in user_ratings.items() if joke_id in item_id_map]
+    )[0]
     
     # 生成推荐
-    recommended_joke_indices, scores = model.recommend(
-        userid=0,  # 新用户ID为0
-        user_items=user_vector,
-        N=5,
-        filter_already_liked_items=False
+    all_joke_ids = list(item_id_map.keys())
+    scores = model.predict(
+        user_ids=0,  # 新用户ID为0
+        item_ids=[item_id_map[joke_id] for joke_id in all_joke_ids]
     )
+    
+    # 排序并获取Top-N推荐
+    top_indices = scores.argsort()[::-1][:5]
     
     # 获取推荐笑话详情
     recommendations_with_content = []
-    for idx, score in zip(recommended_joke_indices, scores):
+    for idx in top_indices:
         joke_id = all_joke_ids[idx]
         joke_content = jokes_df.loc[joke_id, 'joke']
         recommendations_with_content.append({
             'joke_id': joke_id,
-            'predicted_rating': score,
+            'predicted_rating': scores[idx],
             'content': joke_content
         })
     
