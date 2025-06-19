@@ -46,8 +46,8 @@ def initialize_session_state():
 @cache_data
 def load_experiment_data():
     """加载实验数据（纯Pandas处理）"""
-    ratings_path = "output/processed_ratings.csv"
-    jokes_path = "output/Dataset4JokeSet.xlsx"
+    ratings_path = "processed_ratings.csv"
+    jokes_path = "Dataset4JokeSet.xlsx"
     try:
         ratings_df = pd.read_csv(ratings_path)
         jokes_df = pd.read_excel(jokes_path)
