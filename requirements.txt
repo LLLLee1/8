@@ -2,7 +2,8 @@ streamlit==1.24.0
 pandas==2.0.3
 numpy==1.24.4
 openpyxl==3.1.2
-implicit==0.8.6  # 纯Python推荐库，无需编译
+lightfm==1.17  # 纯 Python 推荐库，支持 Python 3.11
+scipy==1.10.1  # lightfm 依赖
 rich==14.0.0
 markdown-it-py==3.0.0
 mdurl==0.1.2
