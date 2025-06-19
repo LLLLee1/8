@@ -342,8 +342,9 @@ def main():
                 st.session_state.current_step = 1
                 st.experimental_rerun()
             
-            if st.button("开始评分", on_click=start_rating):
-                pass
+            if st.button("开始评分"):
+                st.session_state.current_step = 1
+                st.rerun()  # 需Streamlit 1.26.0及以上，或用其他刷新方式
         
         elif current_step == 1:
             # 笑话评分页面
