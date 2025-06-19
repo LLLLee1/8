@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import random
 import os
-from io import BytesIO
 
 # 会话状态初始化
 def initialize_session_state():
@@ -37,6 +36,10 @@ def load_experiment_data(ratings_file=None, jokes_file=None):
             jokes_df = pd.read_excel(jokes_file)
             jokes_df.set_index('joke_id', inplace=True)
             
+            # 保存到会话状态
+            st.session_state.ratings_df = ratings_df
+            st.session_state.jokes_df = jokes_df
+            
             st.success("成功从上传文件加载数据")
             return ratings_df, jokes_df
         
@@ -49,6 +52,10 @@ def load_experiment_data(ratings_file=None, jokes_file=None):
             jokes_df = pd.read_excel(jokes_path)
             jokes_df.set_index('joke_id', inplace=True)
             
+            # 保存到会话状态
+            st.session_state.ratings_df = ratings_df
+            st.session_state.jokes_df = jokes_df
+            
             st.success("成功从固定路径加载数据")
             return ratings_df, jokes_df
         
@@ -60,7 +67,10 @@ def load_experiment_data(ratings_file=None, jokes_file=None):
         return None, None
 
 # 构建用户-笑话评分矩阵
-def build_rating_matrix(ratings_df, jokes_df):
+def build_rating_matrix():
+    ratings_df = st.session_state.ratings_df
+    jokes_df = st.session_state.jokes_df
+    
     if ratings_df is None or jokes_df is None:
         return None, None, None
     
@@ -68,7 +78,7 @@ def build_rating_matrix(ratings_df, jokes_df):
     user_ids = ratings_df['user_id'].unique()
     joke_ids = jokes_df.index.tolist()
     
-    # 创建评分矩阵（使用稀疏矩阵优化内存）
+    # 创建评分矩阵
     rating_matrix = pd.DataFrame(0, index=user_ids, columns=joke_ids)
     
     # 填充评分数据
@@ -79,8 +89,17 @@ def build_rating_matrix(ratings_df, jokes_df):
     return rating_matrix, user_ids, joke_ids
 
 # 生成推荐（纯Python实现协同过滤）
-def generate_recommendations(user_ratings, rating_matrix, user_ids, joke_ids, jokes_df, top_n=5):
-    if not user_ratings or rating_matrix is None:
+def generate_recommendations(top_n=5):
+    user_ratings = st.session_state.user_ratings
+    jokes_df = st.session_state.jokes_df
+    
+    if not user_ratings or jokes_df is None:
+        return []
+    
+    # 构建评分矩阵
+    rating_matrix, user_ids, joke_ids = build_rating_matrix()
+    
+    if rating_matrix is None:
         return []
     
     # 构建新用户评分向量
@@ -135,7 +154,8 @@ def generate_recommendations(user_ratings, rating_matrix, user_ids, joke_ids, jo
     return recommendations
 
 # 计算满意度
-def calculate_satisfaction(rec_ratings):
+def calculate_satisfaction():
+    rec_ratings = st.session_state.recommendation_ratings
     if not rec_ratings:
         return 0
     
@@ -144,45 +164,53 @@ def calculate_satisfaction(rec_ratings):
     satisfaction = ((avg_rating - (-10)) / (10 - (-10))) * 100
     return satisfaction
 
-def display_random_jokes(jokes_df):
+# 显示随机笑话
+def display_random_jokes():
     st.header("请为以下笑话评分")
+    jokes_df = st.session_state.jokes_df
+    
+    # 确保有选中的笑话
     if not st.session_state.selected_jokes:
         joke_ids = jokes_df.index.tolist()
         st.session_state.selected_jokes = random.sample(joke_ids, 3)
     
+    # 显示笑话和评分滑块
     cols = st.columns(3)
     for i, joke_id in enumerate(st.session_state.selected_jokes):
         with cols[i]:
             st.subheader(f"笑话 {i+1}")
             st.write(jokes_df.loc[joke_id, 'joke'])
-            rating = st.slider(f"评分 (-10到10)", -10, 10, 0, key=f"rating_{joke_id}")
+            
+            # 使用key参数确保每个滑块唯一
+            rating = st.slider(
+                f"评分 (-10到10)", 
+                -10, 10, 0, 
+                key=f"rating_{joke_id}"
+            )
+            
             if st.button(f"提交评分", key=f"submit_{joke_id}"):
                 st.session_state.user_ratings[joke_id] = rating
                 st.success(f"已记录评分: {rating}")
+                st.experimental_rerun()  # 立即刷新页面
     
+    # 显示已评分进度
     rated_count = len(st.session_state.user_ratings)
     st.write(f"已评分: {rated_count}/3")
     
-    # 获取推荐按钮修正
+    # 当评分数达到3时，启用获取推荐按钮
     if rated_count >= 3:
         if st.button("获取推荐"):
-            st.session_state.current_step = 3  # 跳到推荐结果步骤
-            st.experimental_rerun()  # 强制页面重新渲染
+            st.session_state.current_step = 3
+            st.experimental_rerun()  # 强制刷新页面
 
 # 显示推荐结果
-def display_recommendations(rating_matrix, user_ids, joke_ids, jokes_df):
+def display_recommendations():
     st.header("为您推荐的笑话")
     
     # 生成推荐（如果还没有）
     if not st.session_state.recommendations:
         with st.spinner("生成推荐中..."):
-            st.session_state.recommendations = generate_recommendations(
-                st.session_state.user_ratings, 
-                rating_matrix, 
-                user_ids, 
-                joke_ids, 
-                jokes_df
-            )
+            st.session_state.recommendations = generate_recommendations()
     
     # 显示推荐结果和评分滑块
     for i, rec in enumerate(st.session_state.recommendations):
@@ -200,6 +228,7 @@ def display_recommendations(rating_matrix, user_ids, joke_ids, jokes_df):
         if st.button(f"提交评分", key=f"rec_submit_{rec['joke_id']}"):
             st.session_state.recommendation_ratings[rec['joke_id']] = rating
             st.success(f"已记录评分: {rating}")
+            st.experimental_rerun()  # 立即刷新页面
     
     # 显示已评分进度
     rated_count = len(st.session_state.recommendation_ratings)
@@ -209,14 +238,14 @@ def display_recommendations(rating_matrix, user_ids, joke_ids, jokes_df):
     if rated_count >= 5:
         if st.button("计算满意度"):
             st.session_state.current_step = 4
-            st.experimental_rerun()  # 强制重新渲染
+            st.experimental_rerun()  # 强制刷新页面
 
 # 显示满意度
 def display_satisfaction():
     st.header("推荐满意度")
     
     # 计算满意度
-    satisfaction = calculate_satisfaction(st.session_state.recommendation_ratings)
+    satisfaction = calculate_satisfaction()
     st.subheader(f"满意度: {satisfaction:.2f}%")
     
     # 根据满意度显示不同的表情和颜色
@@ -244,7 +273,7 @@ def display_satisfaction():
         st.session_state.recommendation_ratings = {}
         
         st.success("已重置所有评分，保留数据")
-        st.experimental_rerun()  # 强制重新渲染
+        st.experimental_rerun()  # 强制刷新页面
 
 # 主应用
 def main():
@@ -278,21 +307,16 @@ def main():
         
         if ratings_file and jokes_file:
             with st.spinner("加载数据中..."):
-                # 保存上传的文件到临时位置（可选）
-                # 注意：Streamlit Cloud上文件是临时的，重启后会丢失
+                # 加载数据并保存到会话状态
+                load_experiment_data(ratings_file, jokes_file)
                 
-                # 加载数据
-                ratings_df, jokes_df = load_experiment_data(ratings_file, jokes_file)
-                
-                if ratings_df is not None and jokes_df is not None:
-                    st.session_state.ratings_df = ratings_df
-                    st.session_state.jokes_df = jokes_df
+                if st.session_state.ratings_df is not None and st.session_state.jokes_df is not None:
                     st.session_state.app_initialized = True
                     st.success("数据加载成功！")
                     
                     # 自动进入下一步
                     st.session_state.current_step = 1
-                    st.experimental_rerun()  # 强制重新渲染
+                    st.experimental_rerun()  # 强制刷新页面
     else:
         # 主流程（数据已加载）
         steps = ["欢迎", "笑话评分", "推荐结果", "满意度"]
@@ -304,25 +328,18 @@ def main():
             st.write("欢迎使用纯Python实现的笑话推荐系统！")
             st.write("系统基于用户评分相似度为您推荐笑话，无需任何编译依赖。")
             
-            # 添加明确的按钮并绑定回调
-            if st.button("开始评分", on_click=lambda: setattr(st.session_state, 'current_step', 2)):
-                pass
+            # 开始评分按钮
+            if st.button("开始评分"):
+                st.session_state.current_step = 1
+                st.experimental_rerun()  # 强制刷新页面
         
         elif current_step == 1:
             # 笑话评分页面
-            display_random_jokes(st.session_state.jokes_df)
+            display_random_jokes()
         
         elif current_step == 2:
             # 推荐结果页面
-            rating_matrix, user_ids, joke_ids = build_rating_matrix(
-                st.session_state.ratings_df, 
-                st.session_state.jokes_df
-            )
-            
-            if rating_matrix is not None:
-                display_recommendations(rating_matrix, user_ids, joke_ids, st.session_state.jokes_df)
-            else:
-                st.error("无法构建评分矩阵，请检查数据格式")
+            display_recommendations()
         
         elif current_step == 3:
             # 满意度页面
