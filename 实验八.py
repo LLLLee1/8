@@ -144,42 +144,30 @@ def calculate_satisfaction(rec_ratings):
     satisfaction = ((avg_rating - (-10)) / (10 - (-10))) * 100
     return satisfaction
 
-# 显示随机笑话
 def display_random_jokes(jokes_df):
     st.header("请为以下笑话评分")
-    
-    # 确保有选中的笑话
     if not st.session_state.selected_jokes:
         joke_ids = jokes_df.index.tolist()
         st.session_state.selected_jokes = random.sample(joke_ids, 3)
     
-    # 显示笑话和评分滑块
     cols = st.columns(3)
     for i, joke_id in enumerate(st.session_state.selected_jokes):
         with cols[i]:
             st.subheader(f"笑话 {i+1}")
             st.write(jokes_df.loc[joke_id, 'joke'])
-            
-            # 使用key参数确保每个滑块唯一
-            rating = st.slider(
-                f"评分 (-10到10)", 
-                -10, 10, 0, 
-                key=f"rating_{joke_id}"
-            )
-            
+            rating = st.slider(f"评分 (-10到10)", -10, 10, 0, key=f"rating_{joke_id}")
             if st.button(f"提交评分", key=f"submit_{joke_id}"):
                 st.session_state.user_ratings[joke_id] = rating
                 st.success(f"已记录评分: {rating}")
     
-    # 显示已评分进度
     rated_count = len(st.session_state.user_ratings)
     st.write(f"已评分: {rated_count}/3")
     
-    # 当评分数达到3时，启用获取推荐按钮
+    # 获取推荐按钮修正
     if rated_count >= 3:
         if st.button("获取推荐"):
-            st.session_state.current_step = 3
-            st.experimental_rerun()  # 强制重新渲染
+            st.session_state.current_step = 3  # 跳到推荐结果步骤
+            st.experimental_rerun()  # 强制页面重新渲染
 
 # 显示推荐结果
 def display_recommendations(rating_matrix, user_ids, joke_ids, jokes_df):
