@@ -72,6 +72,7 @@ def build_rating_matrix():
     jokes_df = st.session_state.jokes_df
     
     if ratings_df is None or jokes_df is None:
+        st.error("数据未加载，请先上传数据")
         return None, None, None
     
     # 提取所有用户和笑话ID
@@ -94,6 +95,7 @@ def generate_recommendations(top_n=5):
     jokes_df = st.session_state.jokes_df
     
     if not user_ratings or jokes_df is None:
+        st.warning("用户评分或笑话数据缺失")
         return []
     
     # 构建评分矩阵
@@ -168,6 +170,10 @@ def calculate_satisfaction():
 def display_random_jokes():
     st.header("请为以下笑话评分")
     jokes_df = st.session_state.jokes_df
+    
+    if jokes_df is None:
+        st.error("笑话数据未加载")
+        return
     
     # 确保有选中的笑话
     if not st.session_state.selected_jokes:
@@ -283,6 +289,9 @@ def main():
     # 初始化会话状态
     initialize_session_state()
     
+    # 调试输出：显示当前会话状态
+    st.write(f"当前会话状态: {st.session_state}")
+    
     # 侧边栏
     with st.sidebar:
         st.header("系统信息")
@@ -328,10 +337,13 @@ def main():
             st.write("欢迎使用纯Python实现的笑话推荐系统！")
             st.write("系统基于用户评分相似度为您推荐笑话，无需任何编译依赖。")
             
-            # 开始评分按钮
-            if st.button("开始评分"):
+            # 增强按钮逻辑
+            def start_rating():
                 st.session_state.current_step = 1
-                st.experimental_rerun()  # 强制刷新页面
+                st.experimental_rerun()
+            
+            if st.button("开始评分", on_click=start_rating):
+                pass
         
         elif current_step == 1:
             # 笑话评分页面
