@@ -4,8 +4,8 @@ import numpy as np
 import pickle
 import random
 import os
-from surprise import Reader, Dataset, SVD
-from surprise.model_selection import train_test_split
+import implicit
+import scipy.sparse as sparse
 import subprocess
 import sys
 
@@ -87,58 +87,29 @@ def initialize_session_state():
     if 'jokes_df' not in st.session_state:
         st.session_state.jokes_df = None
 
-# 加载模型和数据的函数
+# 修改模型训练和预测逻辑
 @cache_resource
 def load_trained_model():
-    """加载训练好的模型"""
+    """加载训练好的模型（适配implicit）"""
     model_path = "output/trained_model.pkl"
     try:
         with open(model_path, 'rb') as f:
-            model = pickle.load(f)
+            model_data = pickle.load(f)
+            
+            # 提取implicit模型和用户-物品矩阵
+            model = model_data['model']
+            user_item_matrix = model_data['user_item_matrix']
+            
         st.session_state.model_loaded = True
         st.success(f"模型加载成功，类型: {type(model)}")
-        return model
+        return model, user_item_matrix
     except Exception as e:
         st.error(f"模型加载失败: {str(e)}")
-        # 打印详细的错误堆栈
-        import traceback
-        st.write(traceback.format_exc())
-        return None
-
-@cache_data
-def load_experiment_data():
-    """加载实验数据"""
-    ratings_path = "output/processed_ratings.csv"  # 相对路径
-    jokes_path = "output/Dataset4JokeSet.xlsx"    # 相对路径
-    try:
-        # 加载评分数据
-        ratings_df = pd.read_csv(ratings_path)
-        
-        # 加载笑话文本数据
-        jokes_df = pd.read_excel(jokes_path)
-        jokes_df.index.name = 'joke_id'
-        
-        return ratings_df, jokes_df
-    except Exception as e:
-        st.error(f"数据加载失败: {e}")
         return None, None
 
-# 检测模型类型
-def detect_model_type(model):
-    """检测模型类型"""
-    if hasattr(model, 'predict'):
-        return 'surprise'
-    else:
-        return 'unknown'
-
-# 为模型准备用户数据
-def prepare_user_data_for_model(user_ratings):
-    """为Surprise模型准备用户数据"""
-    return [(0, joke_id, rating) for joke_id, rating in user_ratings.items()]
-
-# 生成推荐
-def generate_recommendations_with_model(user_ratings, model, jokes_df):
-    """使用训练好的模型生成推荐"""
+# 修改推荐生成函数
+def generate_recommendations_with_model(user_ratings, model, user_item_matrix, jokes_df):
+    """使用implicit模型生成推荐"""
     if not user_ratings:
         st.warning("请先为笑话评分")
         return []
@@ -146,31 +117,32 @@ def generate_recommendations_with_model(user_ratings, model, jokes_df):
     # 获取所有笑话ID
     all_joke_ids = jokes_df.index.tolist()
     
-    # 已评分的笑话ID
-    rated_joke_ids = list(user_ratings.keys())
+    # 构建用户评分向量
+    user_vector = sparse.lil_matrix((1, user_item_matrix.shape[1]))
+    for joke_id, rating in user_ratings.items():
+        if joke_id in all_joke_ids:
+            joke_idx = all_joke_ids.index(joke_id)
+            user_vector[0, joke_idx] = rating
     
-    # 未评分的笑话ID
-    unrated_joke_ids = [joke_id for joke_id in all_joke_ids if joke_id not in rated_joke_ids]
+    # 转换为CSR格式
+    user_vector = user_vector.tocsr()
     
-    # 为未评分的笑话生成预测评分
-    predictions = []
-    for joke_id in unrated_joke_ids:
-        prediction = model.predict(0, joke_id)  # 0是新用户ID
-        predictions.append((joke_id, prediction.est))
+    # 生成推荐
+    recommended_joke_indices, scores = model.recommend(
+        userid=0,  # 新用户ID为0
+        user_items=user_vector,
+        N=5,
+        filter_already_liked_items=False
+    )
     
-    # 按预测评分排序
-    predictions.sort(key=lambda x: x[1], reverse=True)
-    
-    # 获取Top-5推荐
-    top_recommendations = predictions[:5]
-    
-    # 转换为包含笑话内容的格式
+    # 获取推荐笑话详情
     recommendations_with_content = []
-    for joke_id, rating in top_recommendations:
+    for idx, score in zip(recommended_joke_indices, scores):
+        joke_id = all_joke_ids[idx]
         joke_content = jokes_df.loc[joke_id, 'joke']
         recommendations_with_content.append({
             'joke_id': joke_id,
-            'predicted_rating': rating,
+            'predicted_rating': score,
             'content': joke_content
         })
     
