@@ -1,19 +1,9 @@
-# 基础依赖
 streamlit==1.24.0
 pandas==2.0.3
 numpy==1.24.4
 openpyxl==3.1.2
-
-# 关键：用预编译的 scikit-surprise（仅支持 Linux x86_64，适合 Streamlit Cloud）
-scikit-surprise @ https://github.com/conda-forge/scikit-surprise-feedstock/releases/download/v1.1.3/scikit_surprise-1.1.3-py311-none-linux_x86_64.whl
-
-# 依赖包（保持不变）
+implicit==0.8.6  # 纯Python推荐库，无需编译
 rich==14.0.0
 markdown-it-py==3.0.0
 mdurl==0.1.2
 pygments==2.19.1
-
-# 编译工具（可移除，因为用预编译包）
-# wheel==0.40.0
-# setuptools==68.2.2
-# pip==25.1.1
